@@ -1,0 +1,18 @@
+﻿# Binaries
+grepwatch
+grepwatch.exe
+*.exe
+# Environment and secrets
+.env
+.env.*
+!.env.example
+# Go build cache
+*.test
+*.out
+/vendor/
+# IDE
+.vscode/
+.idea/
+# OS
+Thumbs.db
+.DS_Store
