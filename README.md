@@ -2,7 +2,10 @@
 
 # grepWatch
 
-**Catch malicious dependency updates before they reach production.**
+**Catch malicious dependency updates before they reach production!**
+
+- Forget AI attacks!
+- 2026 is the year of the supply chain attack!
 
 grepWatch is an open-source dependency behavioral diff engine. It watches package registeries across six ecosystems and flags when a new release *changes* in suspicious ways. (e.g. new outbound network calls, added obfuscation, high-entropy strings consistent with encoded payloads, and install-time execution hooks)
 
@@ -55,6 +58,4 @@ The worker creates its schema automatically on first run.
 
 ## License
 
-AGPL-3.0 — see [LICENSE](LICENSE). You're free to self-host and modify. If you run
-a modified version as a network service, the AGPL requires you to make your source
-available to its users.
+AGPL-3.0 — see [LICENSE](LICENSE). You're free to self-host and modify. If you run a modified version as a network service, the AGPL requires you to make your source available to its users.
