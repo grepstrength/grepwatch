@@ -4,8 +4,7 @@
 
 **Catch malicious dependency updates before they reach production!**
 
-- Forget AI attacks!
-- 2026 is the year of the supply chain attack!
+*Forget AI! 2026 is the year of the supply chain attack!*
 
 grepWatch is an open-source dependency behavioral diff engine. It watches package registeries across six ecosystems and flags when a new release *changes* in suspicious ways. (e.g. new outbound network calls, added obfuscation, high-entropy strings consistent with encoded payloads, and install-time execution hooks)
 
