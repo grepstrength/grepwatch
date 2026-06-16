@@ -86,6 +86,8 @@ func (s *server) handleLive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	flusher, ok := w.(http.Flusher)
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
