@@ -1,0 +1,22 @@
+[
+  "github.com/stretchr/testify",
+  "github.com/gin-gonic/gin",
+  "github.com/sirupsen/logrus",
+  "github.com/spf13/cobra",
+  "github.com/spf13/viper",
+  "google.golang.org/grpc",
+  "github.com/pkg/errors",
+  "github.com/google/uuid",
+  "github.com/prometheus/client_golang",
+  "github.com/gorilla/mux",
+  "go.uber.org/zap",
+  "github.com/golang-jwt/jwt",
+  "gorm.io/gorm",
+  "github.com/go-redis/redis",
+  "github.com/aws/aws-sdk-go",
+  "github.com/hashicorp/go-multierror",
+  "github.com/mattn/go-sqlite3",
+  "github.com/json-iterator/go",
+  "github.com/fatih/color",
+  "github.com/BurntSushi/toml"
+]

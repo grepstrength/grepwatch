@@ -1,0 +1,22 @@
+[
+  "com.google.guava:guava",
+  "org.apache.commons:commons-lang3",
+  "com.fasterxml.jackson.core:jackson-databind",
+  "org.slf4j:slf4j-api",
+  "junit:junit",
+  "org.apache.logging.log4j:log4j-core",
+  "com.google.code.gson:gson",
+  "org.springframework:spring-core",
+  "commons-io:commons-io",
+  "org.apache.httpcomponents:httpclient",
+  "org.projectlombok:lombok",
+  "ch.qos.logback:logback-classic",
+  "org.mockito:mockito-core",
+  "com.squareup.okhttp3:okhttp",
+  "org.apache.commons:commons-collections4",
+  "org.junit.jupiter:junit-jupiter-api",
+  "com.fasterxml.jackson.core:jackson-core",
+  "org.yaml:snakeyaml",
+  "commons-codec:commons-codec",
+  "org.apache.commons:commons-text"
+]

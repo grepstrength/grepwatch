@@ -92,7 +92,6 @@ func fetchSource(ctx context.Context, pkg model.Package) (string, error) {
 }
 
 //extractTarGz decompresses gzip stream, walks the tar archive and concatenates the contents of every text file into one string
-
 func extractTarGz(r io.Reader) (string, error) {
 	gz, err := gzip.NewReader(r)
 	if err != nil {

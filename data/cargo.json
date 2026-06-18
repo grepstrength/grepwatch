@@ -1,0 +1,22 @@
+[
+  "syn",
+  "quote",
+  "proc-macro2",
+  "serde",
+  "libc",
+  "rand",
+  "serde_json",
+  "bitflags",
+  "cfg-if",
+  "log",
+  "itoa",
+  "unicode-ident",
+  "memchr",
+  "autocfg",
+  "tokio",
+  "once_cell",
+  "hashbrown",
+  "regex",
+  "thiserror",
+  "anyhow"
+]

@@ -1,0 +1,22 @@
+[
+  "Newtonsoft.Json",
+  "Serilog",
+  "Microsoft.Extensions.Logging",
+  "Microsoft.Extensions.DependencyInjection",
+  "Microsoft.Extensions.Configuration",
+  "Polly",
+  "AutoMapper",
+  "Moq",
+  "xunit",
+  "Microsoft.Extensions.Hosting",
+  "Dapper",
+  "FluentValidation",
+  "Microsoft.EntityFrameworkCore",
+  "NUnit",
+  "Swashbuckle.AspNetCore",
+  "MediatR",
+  "Microsoft.Extensions.Http",
+  "System.Text.Json",
+  "FluentAssertions",
+  "Castle.Core"
+]

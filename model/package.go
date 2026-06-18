@@ -51,3 +51,10 @@ type Finding struct {
 	Severity		Severity	`json:"severity"`
 	AnalyzedAt		time.Time	`json:"analyzed_at"`
 }
+//embeds the original Package and adds the four fields the diff engine needs
+type ResolvedPackage struct {
+	Package       Package
+	SourceURL     string
+	PrevVersion   string
+	PrevSourceURL string
+}

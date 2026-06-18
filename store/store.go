@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
+	"errors"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/grepstrength/grepwatch/model"
 )
@@ -55,7 +56,13 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 			signals      JSONB       NOT NULL,
 			analyzed_at  TIMESTAMPTZ NOT NULL
 		);
-
+		CREATE TABLE IF NOT EXISTS watched_versions ( 
+			ecosystem    TEXT        NOT NULL,
+			name         TEXT        NOT NULL,
+			last_version TEXT        NOT NULL,
+			updated_at   TIMESTAMPTZ NOT NULL,
+			PRIMARY KEY (ecosystem, name) 
+		);
 		CREATE INDEX IF NOT EXISTS idx_findings_analyzed_at
 			ON findings (analyzed_at DESC);
 
@@ -97,6 +104,29 @@ func (s *Store) Save(ctx context.Context, f *model.Finding) (int64, error) {
 
 	return id, nil
 }
+/*this returns the most recent version on record for a watched package
+
+if you have never seen a given package before, it returns an empty string
+the caller treats "" as "brand new with nothing to compare against yet"
+then records the current version without diffing
+*/
+func (s *Store) GetLastVersion(ctx context.Context, ecosystem model.Ecosystem, name string) (string, error) {
+	const query = `
+		SELECT last_version
+		FROM watched_versions
+		WHERE ecosystem = $1 AND name = $2;
+		`
+	var version string
+	err := s.pool.QueryRow(ctx, query, string(ecosystem), name).Scan(&version)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) { //translates the response to an empty string so the caller does not have to import pgx for nothing found
+			return "", nil
+		}
+		return "", fmt.Errorf("store: get last version: %w", err)
+	}
+	return version, nil
+}
+
 //this reuns the most recent findings, newest first, up to the given limit 
 func (s *Store) Recent(ctx context.Context, limit int) ([]model.Finding, error) {
 
@@ -150,6 +180,27 @@ func (s *Store) Recent(ctx context.Context, limit int) ([]model.Finding, error) 
 
 	return findings, nil
 }
+//records the latest version seen for a watched package. inserts a new row if the package is new or updates the existing row if its been seen before
+func (s *Store) SetLastVersion(ctx context.Context, ecosystem model.Ecosystem, name, version string) error {
+	const query = `
+		INSERT INTO watched_versions (ecosystem, name, last_version, updated_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (ecosystem, name)
+		DO UPDATE SET last_version = EXCLUDED.last_version, updated_at = NOW();
+	`
+
+	_, err := s.pool.Exec(ctx, query,
+		string(ecosystem),
+		name,
+		version,
+	)
+	if err != nil {
+		return fmt.Errorf("store: set last version: %w", err)
+	}
+
+	return nil
+}
+
 func (s *Store) Close() {
 	s.pool.Close()
 }

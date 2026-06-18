@@ -1,0 +1,22 @@
+[
+  "requests",
+  "urllib3",
+  "boto3",
+  "setuptools",
+  "certifi",
+  "charset-normalizer",
+  "idna",
+  "pip",
+  "numpy",
+  "python-dateutil",
+  "botocore",
+  "typing-extensions",
+  "six",
+  "packaging",
+  "pyyaml",
+  "click",
+  "cryptography",
+  "flask",
+  "jinja2",
+  "wheel"
+]

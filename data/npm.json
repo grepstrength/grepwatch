@@ -1,0 +1,22 @@
+[
+  "express",
+  "lodash",
+  "chalk",
+  "debug",
+  "react",
+  "axios",
+  "commander",
+  "request",
+  "react-dom",
+  "moment",
+  "vue",
+  "webpack",
+  "tslib",
+  "rxjs",
+  "uuid",
+  "yargs",
+  "glob",
+  "semver",
+  "node-fetch",
+  "dotenv"
+]
