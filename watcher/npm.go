@@ -87,7 +87,7 @@ func (n *npmWatcher) checkOne(ctx context.Context, store VersionStore, name stri
 
 	lastSeen, err := store.GetLastVersion(ctx, model.EcosystemNPM, name)
 	if err != nil {
-		return nil, fmt.Errorf("npm watch: get last version for %w", name, err)
+		return nil, fmt.Errorf("npm watch: get last version for %s: %w", name, err)
 	}
 	if latest == lastSeen {
 		return nil, nil

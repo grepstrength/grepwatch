@@ -26,20 +26,29 @@ const maxSourceBytes = 40 * 1024 * 1024
 
 /*
 Analyze is the public entry point for the diff package
-this returns a nil Finding whn both versions fetch and diff successfully but nothig suspicious is found
+***EDITED*** 
+it now takes a model.ResolvePackage instead of (pkg, PreVersion)
+that is the struct that every watcher gives
+the old signature only had one SourceURL so the "previous fetch reused the new versions URL and were diffing a version against itself
 */
-func Analyze(ctx context.Context, pkg model.Package, prevVersion string) (*model.Finding, error) {
-	newSrc, err := fetchSource(ctx, pkg)
+func Analyze(ctx context.Context, rp model.ResolvedPackage) (*model.Finding, error) {
+	newPkg := rp.Package//build the value 
+	newPkg.SourceURL = rp.SourceURL
+
+	newSrc, err := fetchSource(ctx, newPkg)
 	if err != nil {
 		return nil, fmt.Errorf("diff: fetch new version: %w", err)
 	}
 
-	prevPkg := pkg
-	prevPkg.Version = prevVersion
+	prevPkg := rp.Package //same identity but you roll the version back and point at the previous archive
+	prevPkg.Version = rp.PrevVersion
+	prevPkg.SourceURL = rp.PrevSourceURL
+
 	oldSrc, err := fetchSource(ctx, prevPkg)
 	if err != nil {
 		return nil, fmt.Errorf("diff: fetch previous version: %w", err)
 	}
+
 	var signals []model.Signal //run every grep* search function and collect all the signals
 	signals = append(signals, grepOutboundURLs(oldSrc, newSrc)...)
 	signals = append(signals, grepImports(oldSrc, newSrc)...)
@@ -47,8 +56,8 @@ func Analyze(ctx context.Context, pkg model.Package, prevVersion string) (*model
 	signals = append(signals, grepInstallHooks(oldSrc, newSrc)...)
 
 	finding := &model.Finding{
-		Package:     pkg,
-		PrevVersion: prevVersion,
+		Package:     rp.Package, 
+		PrevVersion: rp.PrevVersion, //inthis version, it comes straight off the resolved package now
 		Signals:     signals,
 		AnalyzedAt:  time.Now().UTC(),
 	}
