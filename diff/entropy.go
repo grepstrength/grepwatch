@@ -33,11 +33,12 @@ func shannonEntropy(s string) float64 {
 	}
 	return entropy
 }
-/*this funtion reports whether a string's entropy exeeds the threshold that's considered suspicious. 4.5 bits per character is the line. going above it the string is unlikely to be normal source code or human-written strings
-the threshold is purposefully conservative... would rather flag an iffy string than miss an actual encoded payload
-let analysts decide  
+/*this funtion reports whether a string's entropy exeeds the threshold that's considered suspicious. 5 bits per character is the line. going above it the string is unlikely to be normal source code or human-written strings
+the threshold is purposefully conservative... becuase I'm already skipping over base64 of plaintext (4.7) and hex (4.0)
+the tradeoff is we're losing some potential detections to be a bit more precise
+don't wanna cry wolf
 */
 func isHighEntropy(s string) bool {
-	const threshold = 4.5
+	const threshold = 5.0 //the original value, 4.5 was TOO conservative...
 	return shannonEntropy(s) > threshold
 }

@@ -103,6 +103,7 @@ func TestIsHighEntropy(t *testing.T) {
 		want bool
 	}{
 		{"english prose is not high entropy", "the quick brown fox jumps over the lazy dog", false},
+		{"dotted identifier is not high entropy", "F:Pulumirpc.ProviderHandshakeRequest.MapperTargetFieldNumber", false},
 		{"base64 blob is high entropy", "Tf8sK2dZ9qLpXcV7bRnW4yUe6tGaHjB3oFiQ5sD8wErT2kMzN0pYxCvBuJlAdSg", true},
 	}
 
