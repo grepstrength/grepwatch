@@ -27,7 +27,7 @@ func grepOutboundURLs(oldSrc, newSrc string) []model.Signal {
 	newURLs := reOutboundURL.FindAllString(newSrc, -1)
 	var added []string 
 	for _, u := range newURLs {
-		if !oldURLs[u] {
+		if !oldURLs[u] && !isNoiseURL(u) { //added isNoiseURL
 			added = append(added, u)
 		}
 	}
@@ -36,7 +36,7 @@ func grepOutboundURLs(oldSrc, newSrc string) []model.Signal {
 	}
 	weight := 2
 	for _, u := range added {
-		if reRawIP.MatchString(u) {
+		if reRawIP.MatchString(u) || isPayloadHost(u) { //added isPayloadHost
 			weight = 4
 			break
 		}
@@ -155,4 +155,33 @@ func sliceToSet(items []string) map[string]bool {
 	return set
 }
 
-
+//this marks URLs that are descriptive or navigational than runtim fetch or exfil targets
+//repo clone URLs (.git) or doc achors (#frament) and repo navigation (issues, pulls, blobs, etc)
+//this SHOULD NOT exclude raw-content hosts, /releases/download/, or IPs, which are still potential attacks
+func isNoiseURL(u string) bool {
+	if strings.Contains(u, "#") || strings.HasSuffix(u, ".git") {
+		return true
+	}
+	for _, seg := range []string{"/issues/", "/pull/", "/blob/", "/tree/", "/wiki/", "/commit/", "/discussions/"} {
+		if strings.Contains(u, seg) {
+			return true
+		}
+	}
+	return false
+}
+//this flags the URL shapes that are typically used in malware
+//isNoiseUR filters noise, while isPayloadHost escalates malware indicators
+func isPayloadHost(u string) bool {
+	lower := strings.ToLower(u)
+	for _, h := range []string{"raw.githubusercontent.com", "gist.githubusercontent.com", "gist.github.com", "pastebin.com", "/releases/download/"} {
+		if strings.Contains(lower, h) {
+			return true
+		}
+	}
+	for _, ext := range []string{".sh", ".ps1", ".exe", ".bin", ".dll", ".scr"} {
+		if strings.HasSuffix(lower, ext) {
+			return true
+		}
+	}
+	return false
+}

