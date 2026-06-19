@@ -43,7 +43,7 @@ func grepOutboundURLs(oldSrc, newSrc string) []model.Signal {
 	}
 	return []model.Signal{{
 		Kind:			"new_outbound_url",
-		Description:	"Package version introduced new network destiation(s)",
+		Description:	"Package version introduced new network destination(s)",
 		Evidence:		added,
 		Weight:			weight,
 	}}
@@ -91,7 +91,7 @@ FYI, this relies on the entropy scorer in entropy.go
 */
 func grepStrings(oldSrc, newSrc string) []model.Signal {
 	//this regex is intentionally loosey goosey
-	reStringLit := regexp.MustCompile(`"[^"]{20,}"`) //extracts string literals of at least 20 characters
+	reStringLit := regexp.MustCompile(`"[^"\n]{20,}"`) //string literals of 20+ chars, single-line only... \n stops the match from swallowing whole files between distant double-quotes
 	oldStrings := sliceToSet(reStringLit.FindAllString(oldSrc, -1))
 	newStrings := reStringLit.FindAllString(newSrc, -1)
 
