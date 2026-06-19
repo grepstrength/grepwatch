@@ -47,8 +47,8 @@ func main() {
 	bc := alert.NewBroadcaster() //the broadcaster browsers will connect to 
 
 	srv := &server{db: db, bc: bc} //bulid the server with its dependencies
-
 	mux := http.NewServeMux() //NewServerMux is the standard requst router
+	mux.HandleFunc("/feed.xml", srv.handleFeed)  //for the RSS feed
 	mux.HandleFunc("/api/findings", srv.handleFindings) //REST endpoint, returns recent findings as JSON for the page's initial load
 	mux.HandleFunc("/api/findings/live", srv.handleLive) //SSE endpoint, a long-lived connection that streams new findings live
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { //healthcheck so Railway and uptime monitors can confirm the service is alive
@@ -86,12 +86,12 @@ func (s *server) handleLive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	flusher, ok := w.(http.Flusher)
-	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
 
 	clientCh := s.bc.Subscribe()
 	defer s.bc.Unsubscribe(clientCh)

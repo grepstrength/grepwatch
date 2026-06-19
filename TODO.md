@@ -1,53 +1,40 @@
 # grepWatch — Roadmap
 
-## In progress: v1.1 watcher layer
-Replaced the crawl→resolve split with self-driving "watchers." Each watcher
-reads a checked-in allowlist, fetches each package's metadata once, tracks the
-last-seen version in Postgres (watched_versions table), and on a real version
-change emits a fully-resolved package (new + previous version + both download
-URLs) straight to the diff engine. One metadata fetch does discovery AND
-resolution.
+## Shipped — v1.1 watcher layer
+Self-driving watchers replaced the crawl→resolve split. Each reads a checked-in
+allowlist, fetches metadata once, tracks last-seen version in Postgres
+(watched_versions), and emits a fully-resolved package to the diff engine on a
+real version change.
+- [x] watched_versions store + Get/SetLastVersion
+- [x] Watcher interface + all six watchers (npm, PyPI, Cargo, Maven, NuGet, Go)
+- [x] Worker drives watchers; diff.Analyze takes model.ResolvedPackage
+- [x] Real top-1000 allowlists per ecosystem (cmd/genlists, via ecosyste.ms)
+- [x] Removed obsolete crawler/, resolver/, cmd/watchertest
+- [x] Diff-engine regression tests (severity tiers, new-not-old, entropy threshold)
+- [x] RSS 2.0 feed of findings (/feed.xml)
+- [x] Frontend liveness UI: scrolling "watching" ticker (static representative
+      list, cosmetic), connection-state "Live" pill, scope-framed empty state
 
-- [x] Store layer: watched_versions table + GetLastVersion/SetLastVersion
-- [x] Watcher interface (watcher/watcher.go) + shared loadList
-- [x] npm watcher (registry.npmjs.org metadata, dist-tags.latest) — validated live
-- [x] PyPI watcher (pypi.org/pypi/<pkg>/json, info.version, picks sdist)
-- [x] Cargo watcher (crates.io API, newest_version, dl_path)
-- [x] Maven watcher (Solr search API + constructed repo1 jar URLs)
-- [x] NuGet watcher (flat-container index.json, last element = latest)
-- [x] Go watcher (proxy.golang.org /@latest, module.EscapePath) — last one
-- [ ] Wire worker (cmd/worker) to drive watchers instead of crawlers/resolvers
-- [ ] Change diff.Analyze to accept model.ResolvedPackage
-- [ ] Generate real top-1000 allowlists per ecosystem (currently 20-pkg seeds)
-- [ ] Delete obsolete crawler/ and resolver/ directories + cmd/watchertest
-- [ ] End-to-end validation against a known-bad historical package
-
-## Known limitations to fix
-- **Semver / latest-version trust**: watchers trust each registry's own
-  "latest" field (dist-tags, info.version, newest_version, ordered list)
-  rather than sorting, which sidesteps the lexical-vs-semver problem for
-  finding newest. Previous version = exact last-seen value (not sorted), so
-  no semver issue there either. Good.
-- **Go threat mismatch**: Go's dominant attack vector is typosquatting /
-  impersonation of popular modules (boltdb-go, qmgo), NOT malicious updates
-  to popular modules. The allowlist+diff model catches the latter but misses
-  the former. Go-specific typosquat detection (watch for new packages with
-  names close to popular ones) is a separate future mechanism.
-- **Maven scans bytecode, not source**: fetches the main .jar (compiled),
-  not -sources.jar (which isn't always published). Prefer -sources.jar when
-  available — coarser analysis until then.
-- **grepImports**: substring matching, not AST parsing. Per-ecosystem AST
-  parsing would cut false positives.
+## Known limitations 
+- **Go threat mismatch**: Go's dominant vector is typosquatting, not malicious
+  updates to popular modules — the allowlist+diff model misses the former.
+- **Maven scans bytecode, not source**: fetches the compiled .jar; prefer
+  -sources.jar when published.
+- **grepImports is substring, not AST**: per-ecosystem AST parsing would cut
+  false positives. (Saw this firsthand — "net" matching inside ordinary words.)
+- (Semver/latest-version trust is an intentional design choice, not a bug.)
 
 ## Hardening before "production-ready"
-- Remove localhost dev origins from CORS allowlist (cmd/web/main.go),
-  leaving only the grepwatch.com origins.
-- Persist last-poll timestamp in the worker (or rely on watched_versions,
-  which now serves a similar purpose).
-- Cross-process SSE bridge (Postgres LISTEN/NOTIFY) so worker findings reach
-  web-process browsers live in the two-service deploy.
+- [ ] Remove localhost dev origins from the CORS allowlist (cmd/web/main.go),
+      leaving only the grepwatch.com origins.
+- [ ] Cross-process SSE bridge (Postgres LISTEN/NOTIFY) so worker findings reach
+      web-process browsers live in the two-service deploy.
+- (Last-poll timestamp is now effectively handled by watched_versions.)
 
-## Deferred (dynamic feed — gated on resolvers being truthful)
-- Stats counter (cumulative packages scanned, findings to date).
-- Benign-activity ticker (sampled clean scans, requires tagged SSE envelope).
-- Best built together once watchers produce real scan activity.
+## Next — dynamic feed
+The watchers produce real scan activity, so what was blocked on "truthful
+resolvers" is now buildable:
+- [ ] Stats counter (cumulative packages scanned, findings to date) — real
+      backend tally + /api/stats; the cosmetic ticker is NOT this
+- [ ] Benign-activity ticker (sampled clean scans, tagged SSE envelope)
+- [ ] Go-specific typosquat detection (separate from the allowlist+diff model)
