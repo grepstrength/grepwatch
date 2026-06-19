@@ -1,15 +1,26 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/xml"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+	"sync"
 
 	"github.com/grepstrength/grepwatch/model"
 )
+
+var (
+	feedMu      sync.Mutex
+	feedCached  []byte 
+	feedBuiltAt time.Time
+)
+
+const feedCacheTTL = 60 * time.Second
 
 //RSS 2.0 doc model
 
@@ -41,33 +52,50 @@ type rssGUID struct {
 	Value       string `xml:",chardata"`
 	IsPermaLink bool   `xml:"isPermaLink,attr"`
 }
-//the handler
+//the handler now serves from cache instead of hitting the DB every request
 func (s *server) handleFeed(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	findings, err := s.db.Recent(r.Context(), 50) //the same source the JSON and SSE endpoints
+	body, err := s.cachedFeed(r.Context())
 	if err != nil {
 		log.Printf("handleFeed: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	feed := buildFeed(findings, "https://grepwatch.com") //this is my own site, just replace with yours if you decide to self host
-
 	w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
-	if _, err := w.Write([]byte(xml.Header)); err != nil { //
-		return //client went away mid-write so nothing useful to do
-	}
-	enc := xml.NewEncoder(w)
-	enc.Indent("", "  ") //make it human-readable
-	if err := enc.Encode(feed); err != nil {
-		log.Printf("handleFeed encode: %v", err)
-	}
+	w.Header().Set("Cache-Control", "public, max-age=300") //readers/CDNs cache 5 min too
+	w.Write(body)
 }
+//quick fix because some ppl immediately figured out how to exploit this lol...  returns the rendered feed, ensuring the cahed copy is older than the feedChaceTTL
+func (s *server) cachedFeed(ctx context.Context) ([]byte, error) {
+	feedMu.Lock()
+	defer feedMu.Unlock()
 
+	if feedCached != nil && time.Since(feedBuiltAt) < feedCacheTTL {
+		return feedCached, nil //fresh enough — no DB hit
+	}
+
+	findings, err := s.db.Recent(ctx, 50)
+	if err != nil {
+		return nil, err
+	}
+	feed := buildFeed(findings, "https://grepwatch.com") //obviously, swap with your own domain
+	var buf bytes.Buffer
+	buf.WriteString(xml.Header)
+	enc := xml.NewEncoder(&buf)
+	enc.Indent("", "  ")
+	if err := enc.Encode(feed); err != nil {
+		return nil, err
+	}
+
+	feedCached = buf.Bytes()
+	feedBuiltAt = time.Now()
+	return feedCached, nil
+}
 //turns the findings slice into the RSS document. kept separate from the handler so it's pure (no http, no db) and easily testable
 func buildFeed(findings []model.Finding, siteURL string) rssFeed {
 	items := make([]rssItem, 0, len(findings))
