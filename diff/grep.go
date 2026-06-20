@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"net/url" //parses a URL string
 	"regexp" //needed for pattern matching 
 	"strings" //for simpler substring checks
 
@@ -154,11 +155,42 @@ func sliceToSet(items []string) map[string]bool {
 	}
 	return set
 }
+/*
+isReservedHost is a helper function called by isNoiseURL
+it reports whether a URL points at a host that can never be a eal network desitnation:
+loopback address (127.0.0.1), RFC 2606 reserved example domains, and test client placeholders 
+
+a URL to any of this is never capable of exfiltration and are safe to drop regardless of what file theyre in
+*/
+func isReservedHost(u string) bool {
+	parsed, err := url.Parse(u) //splits "http://testserver/api/" into its constituent parts. "err" is not nli only if the string isn't a valid URL
+	if err != nil {
+		return false //if it can't parse it, let it through
+	}
+	host := strings.ToLower(parsed.Hostname()) //Hostname() pulls just the host out of "parsed" while dropping any :port. use ToLower so "Testserver" and "testserver" compare equally
+	switch host { //exact match for reserved or test-only hosts
+	case "testserver", "localhost", "127.0.0.1", "0.0.0.0", "::1",
+		"example.com", "example.org", "example.net":
+		return true
+	}
+	//reserved TLDs... anything ending in these is a placeholder and non-routable
+	for _, suffix := range []string{".localhost", ".local", ".invalid", ".test", ".example"} {
+		if strings.HasSuffix(host, suffix) {
+			return true
+		}
+	}
+
+	return false
+}
+
 
 //this marks URLs that are descriptive or navigational than runtim fetch or exfil targets
 //repo clone URLs (.git) or doc achors (#frament) and repo navigation (issues, pulls, blobs, etc)
 //this SHOULD NOT exclude raw-content hosts, /releases/download/, or IPs, which are still potential attacks
 func isNoiseURL(u string) bool {
+	if isReservedHost(u) { //testserver, localhost, example.com, etc. are never real destinations
+		return true
+	}
 	if strings.Contains(u, "#") || strings.HasSuffix(u, ".git") {
 		return true
 	}
