@@ -123,7 +123,7 @@ func extractTarGz(r io.Reader) (string, error) {
 		if header.Typeflag != tar.TypeReg {
 			continue
 		}
-		if !isTextFile(header.Name) {
+		if !isScannableFile(header.Name) {
 			continue
 		}
 
@@ -149,7 +149,7 @@ func extractZip(data []byte) (string, error) {
 	var builder strings.Builder
 
 	for _, f := range zr.File {
-		if f.FileInfo().IsDir() || !isTextFile(f.Name) {
+		if f.FileInfo().IsDir() || !isScannableFile(f.Name) {
 			continue
 		}
 
@@ -190,4 +190,40 @@ func isTextFile(name string) bool {
 		}
 	}
 	return false
+}
+//this is a helper function called by extractTarGz and extractZip
+//for every file pulled out of a package, they ask the function if the file's text should be fed to the grep functions
+//true = scan, false= skip
+//this whole function's job is designed to skip files that are documentation, lockfiles, or bundles... which contain artifacts that have nothing to do with how the package behaves at runtime
+//theyre so far the primary source of false positives
+func isScannableFile(name string) bool {
+	if !isTextFile(name) { //the parameter "name" is the file's path inside the archive
+		return false
+	}
+	lower := strings.ToLower(name) //lower is a lowercased copy of the whole path
+	base := lower
+	if i := strings.LastIndexAny(lower, "/\\"); i >= 0 {
+		base = lower[i+1:]
+	}
+	if strings.HasSuffix(lower, ".md") || strings.HasSuffix(lower, ".rst") || strings.HasSuffix(lower, ".txt") { //documentation: URLs here are references ad not calls
+		return false
+	}
+	for _, p := range []string{"readme", "changelog", "changes", "history", "authors", "contributors", "license", "notice"} {
+		if strings.HasPrefix(base, p) {
+			return false
+		}
+	}
+	switch base {
+	case "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "go.sum", "cargo.lock", "poetry.lock", "composer.lock", "gemfile.lock", "pipfile.lock": //lockfiles: resolved tarball URLs and integrity hashes
+		return false
+	}
+	if strings.HasSuffix(lower, ".min.js") || strings.HasSuffix(lower, ".min.css") || strings.HasSuffix(lower, ".map") { //minified: prebuilt bundles and source maps
+		return false
+	}
+	for _, seg := range []string{"/node_modules/", "/vendor/", "/dist/", "/build/", "/docs/", "/doc/"} { //vendored: build output and doc directories 
+		if strings.Contains("/"+lower, seg) {
+			return false
+		}
+	}
+	return true 
 }

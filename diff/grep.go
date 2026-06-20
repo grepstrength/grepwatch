@@ -173,7 +173,7 @@ func isNoiseURL(u string) bool {
 //isNoiseUR filters noise, while isPayloadHost escalates malware indicators
 func isPayloadHost(u string) bool {
 	lower := strings.ToLower(u)
-	for _, h := range []string{"raw.githubusercontent.com", "gist.githubusercontent.com", "gist.github.com", "pastebin.com", "/releases/download/"} {
+	for _, h := range []string{"raw.githubusercontent.com", "gist.githubusercontent.com", "gist.github.com", "pastebin.com"} {
 		if strings.Contains(lower, h) {
 			return true
 		}
