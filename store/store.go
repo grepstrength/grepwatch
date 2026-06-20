@@ -15,6 +15,13 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
+//Stats is the read-model returne dby the Stats method and serialized straight to JSON by the upcoming /api/stats endpoint
+type Stats struct {
+	PackagesWatched	int64 `json:"packages_watched"` //how many distinct packages that are tracked
+	VersionsScanned	int64 `json:"versions_scanned"` //cumulative difs
+	FindingsTotal	int64 `json:"findings_total"`
+}
+
 /*
 New creates a Store by connecting to Postgres using the given connection string (a standard postgres:// URL, which Railway provides as an env var)
 this also ensures the findings table exists
@@ -63,6 +70,14 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 			updated_at   TIMESTAMPTZ NOT NULL,
 			PRIMARY KEY (ecosystem, name) 
 		);
+		CREATE TABLE IF NOT EXISTS scan_stats (
+			id					INTEGER PRIMARY KEY DEFAULT 1,
+			versions_scanned 	BIGINT NOT NULL DEFAULT 0,
+			CONSTRAINT single_row CHECK (id = 1)
+		);
+		INSERT INTO scan_stats (id, versions_scanned)
+		VALUES (1, 0)
+		ON CONFLICT (id) DO NOTHING;
 		CREATE INDEX IF NOT EXISTS idx_findings_analyzed_at
 			ON findings (analyzed_at DESC);
 
@@ -199,6 +214,42 @@ func (s *Store) SetLastVersion(ctx context.Context, ecosystem model.Ecosystem, n
 	}
 
 	return nil
+}
+
+/*
+IncrementVersionsScanned adds n to the running counter
+its called by the worker's analyzeOne (cmd/worker/main.go) once per successful diff, so the number climbs steadily and never resets
+*/
+func (s *Store) IncrementVersionsScanned(ctx context.Context, n int) error {
+	const query = `
+		UPDATE scan_stats
+		SET versions_scanned = versions_scanned + $1
+		WHERE id = 1;
+	`
+	if _, err := s.pool.Exec(ctx, query, n); err != nil { //Exec runs a statement that returns no rows
+		return fmt.Errorf("store: increment versions scanned: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) Stats(ctx context.Context) (Stats, error) {
+	var out Stats //zero valued struct
+	//holds one row per package thats tracked, so COUNT(*) of that table is the number of packages watched
+	const watchedQuery = `SELECT COUNT(*) FROM watched_versions;`
+	if err := s.pool.QueryRow(ctx, watchedQuery).Scan(&out.PackagesWatched); err != nil {
+		return Stats{}, fmt.Errorf("store: count watched: %w", err) //return an empty Stats on any failure so the caller never gets incompleted data
+	}
+	//the single running counter row that's seeded (id = 1)
+	const scannedQuery = `SELECT versions_scanned FROM scan_stats WHERE id = 1;`
+	if err := s.pool.QueryRow(ctx, scannedQuery).Scan(&out.VersionsScanned); err != nil {
+		return Stats{}, fmt.Errorf("store: read versions scanned: %w", err)
+	}
+	//one row per stored findnig so COUNT() is the total
+	const findingsQuery = `SELECT COUNT(*) FROM findings;`
+	if err := s.pool.QueryRow(ctx, findingsQuery).Scan(&out.FindingsTotal); err != nil {
+		return Stats{}, fmt.Errorf("store: count findins: %w", err)
+	}
+	return out, nil //all three fields populated > hand the struct back to the caller
 }
 
 func (s *Store) Close() {

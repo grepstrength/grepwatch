@@ -51,6 +51,7 @@ func main() {
 	mux.HandleFunc("/feed.xml", srv.handleFeed)  //for the RSS feed
 	mux.HandleFunc("/api/findings", srv.handleFindings) //REST endpoint, returns recent findings as JSON for the page's initial load
 	mux.HandleFunc("/api/findings/live", srv.handleLive) //SSE endpoint, a long-lived connection that streams new findings live
+	mux.HandleFunc("/api/stats", srv.handleStats) //returns cumulative scan stats as JSON for the dashboard counter
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { //healthcheck so Railway and uptime monitors can confirm the service is alive
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -78,6 +79,27 @@ func (s *server) handleFindings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(findings); err != nil {
 		log.Printf("handleFindings encode: %v", err)
+	}
+}
+
+//handleStats answer GET /api/stats with the three dashboardnumbers as JSON
+//nearly identical to handleFindings
+func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx := r.Context()
+
+	findings, err := s.db.Stats(ctx)
+	if err != nil { //Stats runs the three small queries of packages watched, versions scanned, and findings total and hands back a store.Stats struct
+		log.Printf("handleStats: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError) //returns a generic message to the client while the real error goes to log.Printf server-side
+		return
+	}
+	w.Header().Set("Content-Type", "application/json") //declare the body is JOSN then encode the struct straight to the response writer
+	if err := json.NewEncoder(w).Encode(findings); err != nil {
+		log.Printf("handleStats encode: %v", err)
 	}
 }
 

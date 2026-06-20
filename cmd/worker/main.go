@@ -88,6 +88,9 @@ func analyzeOne(ctx context.Context, db *store.Store, bc *alert.Broadcaster, rp 
 		log.Printf("analyze %s/%s failed: %v", rp.Package.Ecosystem, rp.Package.Name, err)
 		return
 	}
+	if err := db.IncrementVersionsScanned(ctx, 1); err != nil { //a successfull diff, clean or flagged, is one version scanned
+		log.Printf("increment scan count for %s/%s failed: %v", rp.Package.Ecosystem, rp.Package.Name, err) //this is a non-fatal error on purpose. a missed count should never stop from saving a real finding. log and move along
+	}
 	if len(finding.Signals) == 0 {
 		return //diffed cleanly = nothing suspicious
 	}
