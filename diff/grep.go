@@ -14,7 +14,7 @@ compiling regex can be taxing, so compiling once then reusing it across multiple
 var (
 	reOutboundURL = regexp.MustCompile(`https?://[^\s"'` + "`" + `)]+`) //self explanatory... matches http(s) URLs
 	reRawIP = regexp.MustCompile(`https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`) //matches an http/https URL with a host of a raw IPv4 address... legit packages almost always use domainnames. hardcoded IPs are likely C2s
-	reInstallHook = regexp.MustCompile(`(?i)(preinstall|postinstall|install)\s*[":]`)//matchs common install-time execution hooks across ecosystems... malware will often use these to run code the moment a package is installed
+	reInstallHook = regexp.MustCompile(`(?i)"(?:pre|post)?install"\s*:\s*"([^"]*)"`)//matchs common install-time execution hooks across ecosystems... malware will often use these to run code the moment a package is installed
 )
 
 /*
@@ -125,21 +125,27 @@ these hooks run automatically during package installation, before any applicatio
 this is one of the most exploited software supply chain vectors
 */
 func grepInstallHooks(oldSrc, newSrc string) []model.Signal {
-	oldHooks := reInstallHook.MatchString(oldSrc)
-	newHooks := reInstallHook.MatchString(newSrc)
+	oldHooks := sliceToSet(reInstallHook.FindAllString(oldSrc, -1)) //oldHooks is the set of install-hook lines that already existed in the previous version
+	newHooks := reInstallHook.FindAllString(newSrc, -1) //every install-hook line in the new version
 
 	//this only flags if hooks appear in the new version and did not exist in the old 
 	//install hooks that were always present are normal behavior
-	if newHooks && !oldHooks {
-		return []model.Signal{{
-			Kind:        "new_install_hook",
-			Description: "Package version added install-time execution hook",
-			Evidence:    []string{"install hook detected in new version"},
-			Weight:      3,
-		}}
+	var added []string
+	for _, hook := range newHooks {
+		if !oldHooks[hook] {
+			added = append(added, hook)
+		}
 	}
 
-	return nil
+	if len(added) == 0 {
+		return nil
+	}
+	return []model.Signal{{
+		Kind:        "new_install_hook",
+		Description: "Package version added install-time execution hook",
+		Evidence:    added, //change from previous version - the evidence is now the real hook line(s) and the command they run
+		Weight:      3,
+	}}
 }
 /* 
 this is the helper function to conert a slice of strings into a set for 0(1) membership
