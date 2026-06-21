@@ -15,6 +15,7 @@ var (
 	reOutboundURL = regexp.MustCompile(`https?://[^\s"'` + "`" + `)]+`) //self explanatory... matches http(s) URLs
 	reRawIP = regexp.MustCompile(`https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`) //matches an http/https URL with a host of a raw IPv4 address... legit packages almost always use domainnames. hardcoded IPs are likely C2s
 	reInstallHook = regexp.MustCompile(`(?i)"(?:pre|post)?install"\s*:\s*"([^"]*)"`)//matchs common install-time execution hooks across ecosystems... malware will often use these to run code the moment a package is installed
+	reDangerousImport = regexp.MustCompile(`\b(?:child_process|subprocess|os/exec|socket|eval|vm|net)\b`) //matches the dangersous tokens ONLY as standalone words
 )
 
 /*
@@ -57,20 +58,16 @@ new imports of dangerous modules like child_process, os/exec, etc. signal tat a 
 this will have FPs, which is why this is a weighted score
 */
 func grepImports(oldSrc, newSrc string) []model.Signal {
-	dangerous := []string{ //these are modules that grant command execution or network access... any new import of these warrants investigation
-		"child_process", //Node
-		"subprocess",//Python
-		"os/exec",//Go
-		"socket", //Python raw sockets
-		"net", //Go networking
-		"vm", //Node code evaluation
-		"eval", //dynamic code execution across languages
-	}
-	var added []string 
-	for _, mod := range dangerous { 
-		if strings.Contains(newSrc, mod) && !strings.Contains(oldSrc, mod) { //if the dangerous module appears in the new source, but not the old, i was newly introduced in this version
-			added = append(added, mod)
+	oldMods := sliceToSet(reDangerousImport.FindAllString(oldSrc, -1)) //dangerous tokens already in the previous version. only flag tokens that are newlyintroduced
+	newMods := reDangerousImport.FindAllString(newSrc, -1) //every dangerous token match in the new version
+	seen := make(map[string]bool) //tokens already added, so each appears once
+	var added []string
+	for _, mod := range newMods {
+		if oldMods[mod] || seen[mod] { //skip if it existed before OR we've recorded it
+			continue
 		}
+		seen[mod] = true
+		added = append(added, mod)
 	}
 	if len(added) == 0 {
 		return nil
@@ -188,13 +185,49 @@ func isReservedHost(u string) bool {
 
 	return false
 }
+/*
+isDocHost reports if a URL points at known documentation host: crates python packages and go modules oten embed links into their own docs
+these hosts serve generated documents but not raw downloadable files, so a URL to one is almost always  reference and never a payload
 
+this is why doc hosts are safe for allowlists, but github.com wasn't... it uses raw.githubusercontent for arbitrary file hosting
+docs.rs has no raw-file path so nothing executable can hie behind it
+*/
+func isDocHost(u string) bool {
+	parsed, err := url.Parse(u) //reusing url.Parse, same as isReservedHost
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(parsed.Hostname()) //just the host, lowercase
+	for _, d := range []string{
+		"docs.rs",
+		"docs.python.org",
+		"readthedocs.io",
+		"readthedocs.org",
+		"pkg.go.dev",
+		"godoc.org",
+		"javadoc.io",
+	} {
+		if host == d || strings.HasSuffix(host, "."+d) { //exact host or subdomain
+			return true
+		}
+	}
+	return false
+}
 
-//this marks URLs that are descriptive or navigational than runtim fetch or exfil targets
-//repo clone URLs (.git) or doc achors (#frament) and repo navigation (issues, pulls, blobs, etc)
-//this SHOULD NOT exclude raw-content hosts, /releases/download/, or IPs, which are still potential attacks
+/*
+this marks URLs that are descriptive or navigational than runtim fetch or exfil targets
+repo clone URLs (.git) or doc achors (#frament) and repo navigation (issues, pulls, blobs, etc)
+this SHOULD NOT exclude raw-content hosts, /releases/download/, or IPs, which are still potential attack
+*/
 func isNoiseURL(u string) bool {
 	if isReservedHost(u) { //testserver, localhost, example.com, etc. are never real destinations
+		return true
+	}
+	if isDocHost(u) { //docs.rs, pkg.go.dev, etc. 
+		return true
+	}
+
+	if strings.ContainsAny(u, "{}") { //any templated or formatted address, like {addr} or {port}
 		return true
 	}
 	if strings.Contains(u, "#") || strings.HasSuffix(u, ".git") {

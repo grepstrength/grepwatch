@@ -20,7 +20,9 @@ This checks across the following ecosystems:
 - Maven
 - NuGet
 
-*(FYI this repo is extra verbose with comments because I'm tired of relearning how to code every few months...)*
+*This entire repo is extra verbose with comments because I'm tired of relearning how to code every few months...*
+
+⚠️ **ATTENTION**: I'm still actively tuning the findings in `diff/grep.go`. 
 
 ## Hosted version
 
