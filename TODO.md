@@ -34,7 +34,7 @@ real version change.
 ## Next — dynamic feed
 The watchers produce real scan activity, so what was blocked on "truthful
 resolvers" is now buildable:
-- [ ] Stats counter (cumulative packages scanned, findings to date) — real
+- [x] Stats counter (cumulative packages scanned, findings to date) — real
       backend tally + /api/stats; the cosmetic ticker is NOT this
-- [ ] Benign-activity ticker (sampled clean scans, tagged SSE envelope)
+- [x] Benign-activity ticker (sampled clean scans, tagged SSE envelope)
 - [ ] Go-specific typosquat detection (separate from the allowlist+diff model)
