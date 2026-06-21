@@ -21,7 +21,11 @@ type Stats struct {
 	VersionsScanned	int64 `json:"versions_scanned"` //cumulative difs
 	FindingsTotal	int64 `json:"findings_total"`
 }
-
+type Activity struct {
+	Ecosystem	string	`json:"ecosystem"` //npm, pypi, etc...
+	Name		string	`json:"name"` //the package name the ticker scrolls
+	Version		string	`json:"version"` //the version last recorded for it
+}
 /*
 New creates a Store by connecting to Postgres using the given connection string (a standard postgres:// URL, which Railway provides as an env var)
 this also ensures the findings table exists
@@ -252,8 +256,41 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 	return out, nil //all three fields populated > hand the struct back to the caller
 }
 
+/*
+returns the most recently updaed packages from watched_versions, newest first
+*/
+func (s *Store) RecentActivity(ctx context.Context, limit int) ([]Activity, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 30
+	}
+	const query = `
+		SELECT ecosystem, name, last_version
+		FROM watched_versions
+		ORDER BY updated_at DESC
+		LIMIT $1;
+	`
+	//Query runs a statement that returns many rows
+	rows, err := s.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("store: query activity: %w", err)
+	}
+	defer rows.Close() //release the cursor no matter how the function is lfet
+
+	activity := make([]Activity, 0, limit)
+	for rows.Next() { //advance to each row in turn, false when there are no more
+		var a Activity 
+		if err := rows.Scan(&a.Ecosystem, &a.Name, &a.Version); err != nil {
+			return nil, fmt.Errorf("store: scan activity: %w", err)
+		}
+		activity = append(activity, a) 
+	}
+	if err := rows.Err(); err != nil { //reports an error that happened during iteration
+		return nil, fmt.Errorf("store: iterate activity: %w", err)
+	}
+
+	return activity, nil
+}
+
 func (s *Store) Close() {
 	s.pool.Close()
 }
-
-

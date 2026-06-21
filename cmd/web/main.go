@@ -52,6 +52,7 @@ func main() {
 	mux.HandleFunc("/api/findings", srv.handleFindings) //REST endpoint, returns recent findings as JSON for the page's initial load
 	mux.HandleFunc("/api/findings/live", srv.handleLive) //SSE endpoint, a long-lived connection that streams new findings live
 	mux.HandleFunc("/api/stats", srv.handleStats) //returns cumulative scan stats as JSON for the dashboard counter
+	mux.HandleFunc("/api/activity", srv.handleActivity) //recently scanned packages as JSON for the watch ticker
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { //healthcheck so Railway and uptime monitors can confirm the service is alive
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -102,6 +103,26 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 		log.Printf("handleStats encode: %v", err)
 	}
 }
+//this answers GET /api/activity  with the most recently scanned packages as JSON for the ticker
+//its the same foundation as handleStats with the only difference being he store call
+func (s *server) handleActivity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allower", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx := r.Context() //ties the query to the requests lifetime
+	activity, err := s.db.RecentActivity(ctx, 30) //the 30 most recently updated packages
+	if err != nil {
+		log.Printf("handleActivity: %v", err) //real error to the server log
+		http.Error(w, "internal server error", http.StatusInternalServerError) //generic 500 to the client
+		return
+	}
+	w.Header().Set("Content-Type", "application/json") //JSON body
+	if err := json.NewEncoder(w).Encode(activity); err != nil {
+		log.Printf("handleActivity encode %v", err)
+	}
+}
+
 
 func (s *server) handleLive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
