@@ -98,6 +98,9 @@ func grepStrings(oldSrc, newSrc string) []model.Signal {
 		if oldStrings[s] {
 			continue //if existed befroe but not newly introduced
 		}
+		if strings.Contains(s, "\x00") { //this is an early exit guard. any string carrying a NUL byte is never a base64 or hex payload. its an internal nullseparated data table like for sqlite 
+			continue 
+		}
 		if isHighEntropy(s) {
 			suspicious = append(suspicious, s)
 		}
