@@ -79,28 +79,111 @@ func stripCStyle(src string) string {
 				} else {
 					j++ //plain single char
 				}
-				if j < len(src) && src[j] == '\'' (
-					out.WriteString(src[i : j+1]) 
+				if j < len(src) && src[j] == '\'' {
+					out.WriteString(src[i : j+1])
 					i = j
 					continue
-				)
+			}
 				out.WriteByte(c)
 				continue
 			}
 			if c == '"' || c == '`' { //string literal start. double quote or Go raw backtick
 				state = stringLit
-				delim = c
+				delim = c //reember which quote must close it
 				out.WriteByte(c) //keep the opening quote, strings are preserved
 				continue
 			}
 			out.WriteByte(c) //plain code byte
 		case lineComment:
 			if c == '\n' {
-				staate = code
+				state = code
 				out.WriteByte(c)
 			}
-			case
+		case blockComment:
+			if c == '*' && i+1 < len(src) && src[i+1] == '/' {
+				state = code
+				i++  //consume the /
+			}
+		case stringLit:
+			out.WriteByte(c) //everything inside a string is kept
+			if delim == '`' { //Go raw string: no escapes, only a backtick closes it
+				if c == '`' {
+					state = code
+				}
+				continue
+			}
+			if c == '\\' && i+1 < len(src) { //a backslash escapes the next byte in a "..." string
+				out.WriteByte(src[i+1])
+				i++
+				continue
+			}
+			if c == delim {
+				state = code
+			}
 		}
-
 	}
+	return out.String()
+}
+
+//very similar to stripCStyle, removing # line comments and triple quoted docstrings from Python source
+func stripPython(src string) string {
+	var out strings.Builder
+	out.Grow(len(src))
+
+	const (
+		code = iota
+		lineComment
+		stringLit
+		docstring
+	)
+	state := code
+	var delim byte
+	for i := 0; i < len(src); i++ {
+		c := src[i]
+		switch state {
+		case code:
+			if c == '#' {
+				state = lineComment
+				continue
+			}
+			//triple quote docstring MUST be checked before the single-quote case
+			if (c == '"' || c == '\'') && i+2 < len(src) && src[i+1] == c && src[i+2] == c {
+				state = docstring
+				delim = c
+				i += 2 //consumes the other two quote chars
+				continue //docstring body is dropped, so write nothing
+			}
+			if c == '"' || c == '\'' {
+				state = stringLit
+				delim = c
+				out.WriteByte(c)
+				continue
+			}
+			out.WriteByte(c)
+
+		case lineComment:
+			if c == '\n' {
+				state = code
+				out.WriteByte(c)
+			}
+
+		case stringLit:
+			out.WriteByte(c)
+			if c == '\\' && i+1 < len(src) { 
+				out.WriteByte(src[i+1])
+				i++
+				continue
+			}
+			if c == delim {
+				state = code
+			}
+
+		case docstring:
+			if c == delim && i+2 < len(src) && src[i+1] == delim && src[i+2] == delim {
+				state = code
+				i += 2
+			}
+		}
+	}
+	return out.String()
 }

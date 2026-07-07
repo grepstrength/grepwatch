@@ -126,11 +126,14 @@ func extractTarGz(r io.Reader) (string, error) {
 		if !isScannableFile(header.Name) {
 			continue
 		}
-
-		if _, err := io.Copy(&builder, tr); err != nil {
+		//buffer this files raw bytes on their own
+		var fileBuf bytes.Buffer
+		if _, err := io.Copy(&fileBuf, tr); err != nil {
 			return "", fmt.Errorf("read file %s: %w", header.Name, err)
 		}
-		builder.WriteByte('\n')
+		//stripComments picks the language from the header.Name and removes comment and docstring regions
+		builder.WriteString(stripComments(header.Name, fileBuf.String()))
+		builder.WriteByte('\n')		
 	}
 	return builder.String(), nil
 }
@@ -157,11 +160,13 @@ func extractZip(data []byte) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("open %s: %w", f.Name, err)
 		}
-		if _, err := io.Copy(&builder, io.LimitReader(rc, maxSourceBytes)); err != nil { //guard each indiidual file with a size cap. LimitReader caps each file extraction
+		var fileBuf bytes.Buffer
+		if _, err := io.Copy(&fileBuf, io.LimitReader(rc, maxSourceBytes)); err != nil {
 			rc.Close()
 			return "", fmt.Errorf("read %s: %w", f.Name, err)
 		}
 		rc.Close()
+		builder.WriteString(stripComments(f.Name, fileBuf.String()))
 		builder.WriteByte('\n')
 	}
 

