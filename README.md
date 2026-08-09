@@ -24,6 +24,9 @@ This checks across the following ecosystems:
 
 ⚠️ **ATTENTION**: I'm still actively tuning the findings in `diff/grep.go`. 
 
+### AI Disclaimer
+> **Note:** All code, infrastructure, and technical work here is mine. I used limited AI assistance to help draft the README. 
+
 ## Hosted version
 
 A hosted instance runs at **[grepwatch.com](https://grepwatch.com)** with a live feed of findings — no setup required. Self-hosting is fully supported and documented below and throughout the repo for anyone who wants to run their own instance.
